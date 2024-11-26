@@ -6,7 +6,7 @@ atteinte de diabète en se basant sur un ensemble de données médicales. Nous u
 SVM (Support Vector Machine) : pour classifier les données en fonction de leur hyperplan optimal.
 Random Forest : pour exploiter la puissance d'un ensemble d'arbres de décision.
 
-#Technologies utilisées
+Technologies utilisées
 Langage : Python 3.1.1.9
 Bibliothèques principales :
 scikit-learn : pour l'implémentation des modèles SVM et Random Forest.
