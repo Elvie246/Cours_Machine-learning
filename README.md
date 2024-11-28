@@ -62,6 +62,10 @@ Les données utilisées proviennent de [Kaggle - Diabetes Dataset](https://www.k
 - **Précision du modèle avec un noyau linéaire** et **C**=1.0 : 0.8247
 - **Précision de l'ensemble d'entraînement** : 0,7638
 
+### Contact
+Pour toute question, contactez-moi à : beny.makanga@gmail.com
+
+
 
    
 
