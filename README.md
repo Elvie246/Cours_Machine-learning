@@ -8,7 +8,7 @@
 - [Résultats](#résultats)
 - [Installation](#installation)
 - [Utilisation](#utilisation)
-- [Contributors](#contributeurs)
+
 
 ### Description du projet
 Ce projet vise à prédire la probabilité qu'une personne soit atteinte de diabète en se basant sur un ensemble de données médicales. Nous utilisons deux algorithmes de machine learning :
