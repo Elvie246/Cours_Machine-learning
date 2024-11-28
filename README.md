@@ -56,7 +56,11 @@ Les données utilisées proviennent de [Kaggle - Diabetes Dataset](https://www.k
 - **accuracy** :
 
 #### SVM :
-- **accuracy avec paramètres pas défaut** : 0.7922
+- **Précision avec paramètres pas défaut** : 0.7922
+- **Précision du modèle avec le noyau rbf** et **C**=100.0  : 0.7597
+- **Précision du modèle avec le noyau rbf** et **C**=1000.0  : 0.7078
+- **Précision du modèle avec un noyau linéaire** et **C**=1.0 : 0.8247
+- **Précision de l'ensemble d'entraînement** : 0,7638
 
 
    
