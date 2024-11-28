@@ -53,7 +53,7 @@ Les données utilisées proviennent de [Kaggle - Diabetes Dataset](https://www.k
      
 ### Résultats
 #### Random Forest :
-- **accuracy** :
+
 
 #### SVM :
 - **Précision avec paramètres pas défaut** : 0.7922
