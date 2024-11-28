@@ -1,8 +1,8 @@
-# Cours_Machine-learning
-## Prédiction du diabète avec SVM et Random Forest
+
+# Prédiction du diabète avec SVM et Random Forest
 ## Table des matières
 - [Description du projet](#descriptionduprojet)
-- [Technoogies utilisées](#technologiesutilisées)
+- [Technologies utilisées](#technologiesutilisées)
 - [Données](#données)
 - [Méthodologie](#méthodologie)
 - [Résultats](#résultats)
