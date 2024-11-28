@@ -55,7 +55,7 @@ Les données utilisées proviennent de [Kaggle - Diabetes Dataset](https://www.k
 #### Random Forest :
 - **accuracy** :
 
-### SVM :
+#### SVM :
 - **accuracy** : 
 
 
