@@ -1,0 +1,412 @@
+Cell Type,Source
+markdown,"Polynomial Regression 
+#https://www.kaggle.com/code/farzadnekouei/polynomial-regression-regularization-assumptions"
+markdown,Import Libraries
+code,"import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression
+from sklearn import metrics
+from sklearn.model_selection import KFold
+from sklearn.model_selection import cross_val_score, cross_validate
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.pipeline import make_pipeline
+from sklearn.linear_model import RidgeCV, LassoCV, ElasticNetCV
+from statsmodels.stats.diagnostic import normal_ad
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+from statsmodels.stats.stattools import durbin_watson
+from scipy import stats
+from scipy.special import inv_boxcox"
+markdown,Read Dataset
+code,df = pd.read_csv('C:/Users/aciocan/Documents/MachineLearning/car data.csv')
+code,df.head(5)
+code,df.shape
+code,df.info()
+code,df.describe(include='number')
+code,df.describe(include='object')
+markdown,Data Preparation
+code,"df.drop('Car_Name', axis=1, inplace=True)"
+markdown,"High cardinality refers to variables that have a large number of unique values or categories.
+Whenencode using techniques like One-Hot Encoding, each unique category is turned into its own binary feature. End up with 98 new column/features.
+Car name might not be relevant for predicting the target variable.
+It could introduce noise rather than valuable information."
+code,"df.insert(0, ""Age"", df[""Year""].max()+1-df[""Year""] )
+df.drop('Year', axis=1, inplace=True)
+df.head()"
+code,df.isnull().sum()
+code,df[df.duplicated(keep=False)]
+code,"CatCols = ['Fuel_Type', 'Seller_Type', 'Transmission']"
+code,"fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(15,5), dpi=100)
+colors = ['#0055ff', '#ff7000', '#23bf00']
+CustomPalette = sns.set_palette(sns.color_palette(colors))
+       
+for i in range(len(CatCols)):
+    graph = sns.countplot(x=CatCols[i], data=df, ax=ax[i])
+    ax[i].set_xlabel(CatCols[i], fontsize=15)
+    ax[i].set_ylabel('Count', fontsize=12)
+    ax[i].set_ylim([0,300])
+    ax[i].set_xticklabels(ax[i].get_xticklabels(), fontsize=12)
+    for cont in graph.containers:
+        graph.bar_label(cont)
+
+plt.suptitle('Frequency Distribution of Categorical Variables', fontsize=20) 
+plt.tight_layout()
+plt.show()"
+markdown,Categorical Variables Encoding
+code,"CatCols = ['Fuel_Type', 'Seller_Type', 'Transmission'] #one-hot encoding, CNG baseline, dealer=baseline, automatin=baseline reference
+# the baseline category is the category against which the other categories are compared. 
+
+df1 = pd.get_dummies(df, columns=CatCols, drop_first=True)
+df1.head(5)"
+markdown,Correlation Analysis
+code,"target = 'Selling_Price'
+cmap = sns.diverging_palette(125, 28, s=100, l=65, sep=50, as_cmap=True)
+fig, ax = plt.subplots(figsize=(9, 8), dpi=80)
+ax = sns.heatmap(pd.concat([df1.drop(target,axis=1), df1[target]],axis=1).corr(), annot=True, cmap=cmap)
+plt.show()"
+code,"X = df1.drop('Selling_Price', axis=1)
+y = df1['Selling_Price']"
+code,"X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0)"
+code,"print('X_train shape: ', X_train.shape)
+print('X_test shape: ', X_test.shape)
+print('y_train shape: ', y_train.shape)
+print('y_test shape: ',y_test.shape)"
+code,y_test_actual = y_test
+code,"scaler = StandardScaler()
+scaler.fit(X_train)
+X_train_scaled = scaler.transform(X_train)
+X_test_scaled = scaler.transform(X_test)"
+markdown,Train the model
+code,"linear_reg = LinearRegression()
+linear_reg.fit(X_train_scaled, y_train)"
+code,"pd.DataFrame(data = np.append(linear_reg.intercept_ , linear_reg.coef_), 
+             index = ['Intercept']+[col+"" Coef."" for col in X.columns], columns=['Value']).sort_values('Value', ascending=False)"
+markdown,"Coefficient in a regression model shows how much the target variable (car price) changes when the corresponding feature changes, assuming all other features remain constant.
+
+Intercept (4.302488): the predicted value of the target variable when all the independent variables are equal to zero.
+
+Present_Price Coefficient (3.492729):This means that for each unit increase in Present_Price, the target variable (probably car price or something related) is expected to increase by 3.492729 units, assuming all other variables are held constant.A positive coefficient indicates a positive relationship: as the present price increases, the dependent variable also increases.
+
+Fuel_Type_Diesel Coefficient (0.850217):This means that when the fuel type is diesel, the price is expected to increase by 0.850217 units compared to the baseline fuel type (which is ""Fuel_Type_CNG""(gasoline) = reference category).The positive coefficient indicates that diesel vehicles are associated with higher values of the target variable compared to the baseline.(if the price cng is 1.0 , than the price diesel car is 1.0+0.850217)
+
+Owner Coefficient (-0.232722):This means that for each additional previous owner, the target variable is expected to decrease by 0.232722 units, holding all other variables constant.
+The negative coefficient indicates that more previous owners tend to decrease the value of the target variable (which makes sense in the context of car prices, as more owners may reduce a car's value).
+
+Seller_Type_Individual Coefficient (-0.377334):This means that when the seller is an individual, the price is expected to decrease by 0.377334 units.
+A negative coefficient indicates that cars sold by individual sellers may have lower values compared to cars sold by dealers.
+
+Kms_Driven Coefficient (-0.589672):For every additional unit increase in Kms_Driven (likely in thousands of kilometers), the price decreases by 0.589672 units.
+This makes sense because the more a car has been driven, the more its value likely decreases, leading to a negative relationship.
+
+Age Coefficient (-0.936339):For every additional year of age of the car, the price decreases by 0.936339 units.
+This reflects the fact that older cars typically lose value, so the negative coefficient suggests that as a car ages, its value drops."
+markdown,Model Evaluation
+code,"def model_evaluation(model, X_test, y_test, model_name):
+    y_pred = model.predict(X_test)
+    
+    MAE = metrics.mean_absolute_error(y_test, y_pred)
+    MSE = metrics.mean_squared_error(y_test, y_pred)
+    RMSE = np.sqrt(MSE)
+    R2_Score = metrics.r2_score(y_test, y_pred)
+    
+    return pd.DataFrame([MAE, MSE, RMSE, R2_Score], index=['MAE', 'MSE', 'RMSE' ,'R2-Score'], columns=[model_name])"
+code,"model_evaluation(linear_reg, X_test_scaled, y_test, 'Linear Reg.')"
+markdown,"MAE (Mean Absolute Error):is the average of the absolute differences between the predicted values and the actual values. It measures the average magnitude of the errors in a set of predictions, without considering their direction.
+MAE = 1.242671 means that, on average, the model’s predictions are 1.242671 units away from the actual values.
+Lower values of MAE indicate better performance.
+
+MSE (Mean Squared Error):4.432128 means that, on average, the squared differences between the predicted and actual values are 4.432128 units.
+
+RMSE (Root Mean Squared Error):
+
+R²-Score (Coefficient of Determination):measures how well the regression model fits the data. It tells you the proportion of the variance in the dependent variable that is predictable from the independent variables.R²-Score = 0.851798 means that about 85.18% of the variance in the target variable is explained by the model.
+R² ranges from 0 to 1:
+1 means the model perfectly predicts the data.
+0 means the model does no better than predicting the mean of the data.
+
+
+ the model explains the majority of the variance"
+markdown,Model Evaluation using Cross-Validation
+markdown,"technique used to assess how well a model generalizes to unseen data
+ It involves splitting the dataset into several subsets (called folds), training the model on some of the folds, and testing it on the remaining folds. This process is repeated multiple times"
+code,"linear_reg_cv = LinearRegression()
+scaler = StandardScaler()
+pipeline = make_pipeline(StandardScaler(),  LinearRegression())
+
+kf = KFold(n_splits=6, shuffle=True, random_state=0) 
+scoring = ['neg_mean_absolute_error', 'neg_mean_squared_error', 'neg_root_mean_squared_error', 'r2']
+result = cross_validate(pipeline, X, y, cv=kf, return_train_score=True, scoring=scoring)
+
+MAE_mean = (-result['test_neg_mean_absolute_error']).mean()
+MAE_std = (-result['test_neg_mean_absolute_error']).std()
+MSE_mean = (-result['test_neg_mean_squared_error']).mean()
+MSE_std = (-result['test_neg_mean_squared_error']).std()
+RMSE_mean = (-result['test_neg_root_mean_squared_error']).mean()
+RMSE_std = (-result['test_neg_root_mean_squared_error']).std()
+R2_Score_mean = result['test_r2'].mean()
+R2_Score_std = result['test_r2'].std()
+
+pd.DataFrame({'Mean': [MAE_mean,MSE_mean,RMSE_mean,R2_Score_mean], 'Std': [MAE_std,MSE_std,RMSE_std,R2_Score_std]},
+             index=['MAE', 'MSE', 'RMSE' ,'R2-Score'])"
+markdown,"Std = 0.211388: The standard deviation shows how much the MAE varies across different cross-validation folds. A small standard deviation (0.211388) means the performance is relatively stable across different folds, which is a good sign.
+
+Std = 2.325318: The relatively higher standard deviation (2.325318) suggests there is some variability in the model's performance across different folds. It could mean that the model performs better on some subsets of the data than others.
+
+Std = 0.565172: The standard deviation is moderate here, indicating some variability but not extreme. RMSE is in the same units as the target variable, making it easy to interpret.
+
+Std = 0.048023: The low standard deviation shows that the R² score does not vary much across the cross-validation folds, indicating consistent model performance.
+"
+markdown,Assumptions
+markdown,"Linearity
+linear relationship between the independent variables or features and the dependent variable or label.
+
+To detect nonlinearity:
+
+Plots of actual vs. predicted values -> The desired outcome is that points are symmetrically distributed around a diagonal line
+Plots of residuals vs. predicted values -> The desired outcome is that points are symmetrically distributed around a horizontal line
+Scatter Plot (for simple linear regression)"
+code,"def residuals(model, X_test, y_test):
+    '''
+    Creates predictions on the features with the model and calculates residuals
+    '''
+    y_pred = model.predict(X_test)
+    df_results = pd.DataFrame({'Actual': y_test, 'Predicted': y_pred})
+    df_results['Residuals'] = abs(df_results['Actual']) - abs(df_results['Predicted'])
+    
+    return df_results"
+code,"def linear_assumption(model, X_test, y_test):
+    '''
+    Function for visually inspecting the assumption of linearity in a linear regression model
+    '''
+    df_results = residuals(model, X_test, y_test)
+    
+    fig, ax = plt.subplots(1,2, figsize=(15,6), dpi=80)
+    sns.regplot(x='Predicted', y='Actual', data=df_results, lowess=True, ax=ax[0],
+                color='#0055ff', line_kws={'color':'#ff7000','ls':'--','lw':2.5})
+    ax[0].set_title('Actual vs. Predicted Values', fontsize=15)
+    ax[0].set_xlabel('Predicted', fontsize=12)
+    ax[0].set_ylabel('Actual', fontsize=12)        
+    
+    sns.regplot(x='Predicted', y='Residuals', data=df_results, lowess=True, ax=ax[1],
+                color='#0055ff', line_kws={'color':'#ff7000','ls':'--','lw':2.5})
+    ax[1].set_title('Residuals vs. Predicted Values', fontsize=15)
+    ax[1].set_xlabel('Predicted', fontsize=12)
+    ax[1].set_ylabel('Residuals', fontsize=12)  "
+code,"linear_assumption(linear_reg, X_test_scaled, y_test)"
+markdown,the linearity assumption is violated (not satisfied).
+markdown,Assumption 2 - Normality of Residuals
+code,"This assumes that the error terms of the model are normally distributed with a mean value of zero.
+few large outliers in data affecting our model"
+code,"def normal_errors_assumption(model, X_test, y_test, p_value_thresh=0.05):
+    '''
+    Function for inspecting the assumption of normality of residuals.
+    '''
+    df_results = residuals(model, X_test, y_test)
+    
+    # Anderson-Darling Test
+    p_value = normal_ad(df_results['Residuals'])[1]
+    
+    print('\nP-value from the test (below 0.05 generally means non-normal):  ', np.round(p_value,6))
+    if p_value < p_value_thresh:
+        print('Residuals are not normally distributed. Assumption not satisfied.') 
+    else:
+        print('Residuals are normally distributed. Assumption satisfied.')
+ # Residuals Histogram
+    fig, ax = plt.subplots(1,2, figsize=(15,6), dpi=80)
+    
+    sns.histplot(data=df_results, x='Residuals', kde=True, ax=ax[0], bins=15, 
+                 color='#0055ff', edgecolor='none', alpha=0.4, line_kws={'lw': 2.5})
+    ax[0].set_xlabel('Residuals', fontsize=12)
+    ax[0].set_ylabel('Count', fontsize=12)
+    ax[0].set_title('Distribution of Residuals', fontsize=15)
+    textstr = '\n'.join((
+        r'$\mu=%.2f$' %np.mean(df_results['Residuals']),
+        r'$\sigma=%.2f$' %np.std(df_results['Residuals']),
+        ))
+    ax[0].text(0.7, 0.9, textstr, transform=ax[0].transAxes, fontsize=15, verticalalignment='top',
+                 bbox=dict(boxstyle='round',facecolor='#509aff', edgecolor='black', pad=0.5))
+        # Q-Q Probability Plot
+    stats.probplot(df_results['Residuals'], dist=""norm"", plot= ax[1])
+    ax[1].set_title(""Residuals Q-Q Plot"", fontsize=15)
+    ax[1].set_xlabel('Theoretical Quantiles', fontsize=12)
+    ax[1].set_ylabel('Ordered Values', fontsize=12)
+    ax[1].get_lines()[0].set_markerfacecolor('#509aff')
+    ax[1].get_lines()[1].set_color('#ff7000')
+    ax[1].get_lines()[1].set_linewidth(2.5)
+    ax[1].get_lines()[1].set_linestyle('--')
+    ax[1].legend(['Actual','Theoretical'])
+    
+    
+    plt.show()"
+code,"normal_errors_assumption(linear_reg, X_test_scaled, y_test)"
+markdown,"the residuals have excessive skewness, meaning they are not symmetrically distributed.
+Skewness occurs when the distribution is ""pulled"" in one direction, either to the left (negative skewness) or to the right (positive skewness).
+In a normal distribution, the points in a QQ plot should form a straight diagonal line. A bow-shaped deviation indicates that the residuals deviate significantly from normality.
+These deviations from normality show that the residuals do not follow a Gaussian distribution, which could lead to incorrect inferences from the regression model if left unaddressed.
+
+The normality of residuals ensures that the model's predictions are unbiased 
+
+ To address these issues, consider nonlinear transformations (such as log or square root transformations) of the variables or removing outliers to ensure the residuals are closer to a normal distribution. These corrections help improve model performance and validity.
+
+ df['log_target'] = np.log(df['target'])
+
+ from scipy import stats
+df = df[(np.abs(stats.zscore(df['feature'])) < 3)] #removing potential outliers; z-score identifies data points that are far from the mean"
+markdown,Assumption 3 - No Perfect Multicollinearity
+markdown,When the independent variables are correlated to each other.
+markdown,Use a heatmap of the correlation
+markdown,Assumption 4 - No Autocorrelation of Residuals
+markdown,"The assumption is that the residuals should be independent of each other.Autocorrelation refers to the correlation of a variable with itself over successive time intervals or observations. 
+
+In regression analysis, autocorrelation of residuals means that the residuals (errors) from one observation are correlated with residuals from another observation.
+This is usually a sign that the model is missing some information and not properly capturing certain patterns in the data."
+markdown,"The Durbin-Watson test is used to detect the presence of autocorrelation in the residuals of a regression model. The test statistic, d, ranges from 0 to 4.
+
+d = 2: This means no autocorrelation.
+1.5 < d < 2.5: This is generally considered acceptable and indicates that there is little to no autocorrelation.
+d < 1.5: Indicates positive autocorrelation, meaning residuals are positively correlated with one another.
+d > 2.5: Indicates negative autocorrelation, meaning residuals are negatively correlated with one another."
+code,"def autocorrelation_assumption(model, X_test, y_test):
+    '''
+    It assumes that there is no autocorrelation in the residuals. If there is autocorrelation, then 
+    there is a pattern that is not explained because the current value is dependent on the previous value.
+    '''
+    df_results = residuals(model, X_test, y_test)
+
+    durbinWatson = durbin_watson(df_results['Residuals'])
+    print('Durbin-Watson:', round(durbinWatson,3))
+    
+    if durbinWatson < 1.5:
+        print('Signs of positive autocorrelation. Assumption not satisfied.', '\n')
+    elif durbinWatson > 2.5:
+        print('Signs of negative autocorrelation. Assumption not satisfied.', '\n')
+    else:
+        print('Little to no autocorrelation. Assumption satisfied.', '\n')"
+code,"autocorrelation_assumption(linear_reg, X_test_scaled, y_test)"
+markdown,"Durbin-Watson value is 1.823, which falls between 1.5 and 2.5, meaning there is little to no autocorrelation. Therefore, the assumption of no autocorrelation of residuals is satisfied in this case."
+markdown,"Example of Interaction Terms in Your Model:
+
+An interaction term could be added between Present_Price and Kms_Driven to capture their combined effect on car prices.
+
+
+# Adding an interaction term between Present_Price and Kms_Driven
+X['Present_Price_Kms_Driven'] = X['Present_Price'] * X['Kms_Driven']
+
+# Fit the regression model again with the interaction term included
+model_with_interaction = LinearRegression()
+model_with_interaction.fit(X, y)"
+markdown,Interaction terms allow the model to capture non-linear relationships between predictor variables that might not be explained by including those predictors individually.
+markdown,Assumption 5 - Homoscedasticity
+markdown,"Means that the residuals doesn’t change across all the values of the target variable.
+The effect of heteroscedasticity might also be putting too much weight to a subset of data when estimating coefficients.
+plot of residuals vs. predicted values."
+code,"def homoscedasticity_assumption(model, X_test, y_test):
+    """"""
+    Homoscedasticity assumes that the residuals exhibit constant variance
+    """"""
+    print('The orange line should be flat:')
+    df_results = residuals(model, X_test, y_test)
+    
+    fig = plt.figure(figsize=(6,6), dpi=80)
+    sns.regplot(x='Predicted', y='Residuals', data=df_results, lowess=True,
+                color='#0055ff', line_kws={'color':'#ff7000','ls':'--','lw':2.5})
+    plt.axhline(y=0, color='#23bf00', lw=1)
+    plt.title('Residuals vs. Predicted Values', fontsize=15)
+    plt.xlabel('Predicted Values', fontsize=12)
+    plt.ylabel('Residuals', fontsize=12)    
+    plt.show()"
+code,"homoscedasticity_assumption(linear_reg, X_test_scaled, y_test)"
+markdown,Not a fully uniform variance across the residuals because the orange line is not flat. 
+code,"#drop variable
+del df1['Fuel_Type_Petrol']"
+markdown,Apply Box-Cox Transformation
+markdown,"In order to satisfy the regression assumptions, we apply the Box-Cox transformation on the whole dataset. "
+code,"fitted_lambda = pd.Series(np.zeros(len(df1.columns), dtype=np.float64), index=df1.columns)
+
+y_train, fitted_lambda['Selling_Price'] = stats.boxcox(y_train+1)
+for col in X_train.columns:
+    X_train[col], fitted_lambda[col] = stats.boxcox(X_train[col]+1)
+    
+fitted_lambda"
+code,"y_test = stats.boxcox(y_test+1, fitted_lambda['Selling_Price'])
+for col in X_test.columns:
+    X_test[col] = stats.boxcox(X_test[col]+1, fitted_lambda[col])"
+code,"y_train = pd.DataFrame(y_train, index=X_train.index, columns=['Selling_Price'])
+y_test = pd.DataFrame(y_test, index=X_test.index, columns=['Selling_Price'])
+
+X_boxcox = pd.concat([X_train, X_test])
+y_boxcox = pd.concat([y_train, y_test])
+
+df_boxcox = pd.concat([X_boxcox, y_boxcox], axis=1)
+df_boxcox.sort_index(inplace=True)
+
+del df_boxcox['Fuel_Type_Petrol']"
+code,"fig, ax = plt.subplots(2, 4, figsize=(15,8), dpi=100)
+columns = ['Selling_Price', 'Present_Price', 'Kms_Driven', 'Age']
+
+for i,col in enumerate(columns):
+    sns.kdeplot(df1[col], label=""Non-Normal"", fill=True, color='#0055ff', linewidth=2, ax=ax[0,i])
+    sns.kdeplot(df_boxcox[col], label=""Normal"", fill=True, color='#23bf00', linewidth=2, ax=ax[1,i])  
+    ax[0,i].set_xlabel('', fontsize=15)
+    ax[1,i].set_xlabel(col, fontsize=15, fontweight='bold')
+    ax[0,i].legend(loc=""upper right"")
+    ax[1,i].legend(loc=""upper right"")
+
+ax[0,2].tick_params(axis='x', labelrotation = 20)
+plt.suptitle('Data Transformation using Box-Cox', fontsize=20)
+plt.tight_layout()
+plt.show()"
+code,"X = df_boxcox.drop('Selling_Price', axis=1)
+y = df_boxcox['Selling_Price']"
+markdown,
+markdown,Polynomial Regression
+code,"To overcome under-fitting and meet linear regression assumptions,
+first try to increase the complexity of the model by adding all of the second-order terms of the features:"
+code,"poly_features = PolynomialFeatures(degree=2, include_bias=False)
+X_poly = poly_features.fit_transform(X)
+X_poly = pd.DataFrame(X_poly, columns=poly_features.get_feature_names_out(X.columns))
+X_poly.head(5)"
+code,"poly_features_names = poly_features.get_feature_names_out(X.columns)
+len(poly_features_names)"
+code,"X_poly_train, X_poly_test, y_poly_train, y_poly_test = train_test_split(X_poly, y, test_size=0.3, random_state=0)
+print('X_poly_train shape: ', X_poly_train.shape)
+print('X_poly_test shape: ', X_poly_test.shape)
+print('y_poly_train shape: ', y_poly_train.shape)
+print('y_poly_test shape: ',y_poly_test.shape)"
+code,"scaler = StandardScaler()
+scaler.fit(X_poly_train)
+
+X_poly_train = scaler.transform(X_poly_train)
+X_poly_train = pd.DataFrame(X_poly_train, columns=poly_features_names)
+
+X_poly_test = scaler.transform(X_poly_test)
+X_poly_test = pd.DataFrame(X_poly_test, columns=poly_features_names)"
+code,"polynomial_reg = LinearRegression()
+polynomial_reg.fit(X_poly_train, y_poly_train)"
+code,"model_evaluation(polynomial_reg, X_poly_test, y_poly_test, 'Polynomial Reg. Test')"
+code,"model_evaluation(polynomial_reg, X_poly_train, y_poly_train, 'Polynomial Reg. Train')"
+markdown,"The accuracy of the model on the training and test data are close to each other, so the model is not overfit."
+code,y
+code,"pipeline = make_pipeline(PolynomialFeatures(degree=2), StandardScaler(),  LinearRegression())
+
+kf = KFold(n_splits=6, shuffle=True, random_state=0) 
+scoring = ['neg_mean_absolute_error', 'neg_mean_squared_error', 'neg_root_mean_squared_error', 'r2']
+result2 = cross_validate(pipeline, X, y, cv=kf, return_train_score=True, scoring=scoring)
+
+MAE_mean = (-result2['test_neg_mean_absolute_error']).mean()
+MAE_std = (-result2['test_neg_mean_absolute_error']).std()
+MSE_mean = (-result2['test_neg_mean_squared_error']).mean()
+MSE_std = (-result2['test_neg_mean_squared_error']).std()
+RMSE_mean = (-result2['test_neg_root_mean_squared_error']).mean()
+RMSE_std = (-result2['test_neg_root_mean_squared_error']).std()
+R2_Score_mean = result2['test_r2'].mean()
+R2_Score_std = result2['test_r2'].std()
+
+pd.DataFrame({'Mean': [MAE_mean,MSE_mean,RMSE_mean,R2_Score_mean], 'Std': [MAE_std,MSE_std,RMSE_std,R2_Score_std]},
+             index=['MAE', 'MSE', 'RMSE' ,'R2-Score'])"
+code,
+markdown,
